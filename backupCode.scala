@@ -1,3 +1,56 @@
+
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
+
+import java.io.File
+import java.nio.file.{Files, Paths, StandardCopyOption}
+import java.time.{LocalDate, LocalDateTime}
+import java.time.format.DateTimeFormatter
+import java.util.Collections
+import java.{io, util}
+
+object SimpleApp {
+  def main(args: Array[String]) {
+    val toBeProcessedFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/toBeProcessed"
+    val processedFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/Processed"
+    val reportFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/Reports"
+    val sortedFolderMap = sortFolderNames("/Users/priyadarshanp/Documents/DEBootCamp/files/toBeProcessed");
+    val allDataRepoFolder = "/Users/priyadarshanp/Documents/DEBootCamp/files/allFileRepo"
+
+    sortedFolderMap.keySet().forEach(_ => {
+      val folderName = sortedFolderMap.get(_);
+      val processedTargetFolder = Files.createDirectory(Paths.get(String.format("%s/%s", processedFolderLocation, folderName)));
+      val toBeProcessedSourceFolder = Files.createDirectory(Paths.get(String.format("%s/%s", toBeProcessedFolderLocation, folderName)));
+
+      toBeProcessedSourceFolder.toFile.listFiles().foreach(_ => {
+        
+      })
+
+
+
+      Files.move(toBeProcessedSourceFolderPath, processedTargetFolder.toAbsolutePath, StandardCopyOption.ATOMIC_MOVE)
+      Files.
+
+
+    });
+
+      println("Printing sortedFolderMap:" +sortedFolderMap);
+  }
+
+  private def sortFolderNames(dirPath:String): util.TreeMap[LocalDate, String] = {
+
+    val folderDateTimeMap = new util.TreeMap[LocalDate, String]()
+    val list1 = new File(dirPath).listFiles.filter(_.isDirectory).map(_.getName).toList;
+
+    val list = new io.File(dirPath).listFiles.filter(_.isDirectory).map(_.getName)
+      .map(folderName => folderDateTimeMap.put(LocalDate.parse(folderName, DateTimeFormatter.ofPattern("yyyy-MM-dd")), folderName)).toList;
+
+    folderDateTimeMap;
+  }
+}
+
+
+
 /*val conf = new SparkConf().setMaster("spark://Priyadarshans-MacBook-Pro-2.local:7077")
     .setAppName("Simple Application").setJars(Array("/Users/priyadarshanp/Documents/DEBootCamp/jars/postgresql-42.5.0.jar")).set("spark.jars", "/Users/priyadarshanp/Documents/DEBootCamp/jars/postgresql-42.5.0.jar")
 
