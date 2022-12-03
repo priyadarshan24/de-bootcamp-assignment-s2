@@ -120,6 +120,7 @@ object SimpleApp {
       val reportPath = String.format("%s/%s.%s", targetReportFolderPath, reportNameTopContent, "csv")
 
       var sparkQueryToExecute = String.format("select SUBSTRING_INDEX(context.page.title, '-', 1) as realtitle, sum(properties.video_length) as totalLengthOfVideoWatched  from %s where event = 'Watched Video' and  eventDate > date_add(DATE('%s'), -7) and eventDate <= DATE('%s') group by realtitle sort by totalLengthOfVideoWatched desc", tableName, reportDate, reportDate);
+      //sparkQueryToExecute = "select count(*) from ga_events where eventDate = '2022-01-01'"
       println("Printing sparkQueryToExecute:" + sparkQueryToExecute)
 
       var popularContentByTileBasisVideoLengthWatched = spark.sql(sparkQueryToExecute)
