@@ -8,3 +8,6 @@ lazy val root = (project in file("."))
   )
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.3.1"
+// https://mvnrepository.com/artifact/org.apache.spark/spark-hive
+libraryDependencies += "org.apache.spark" %% "spark-hive" % "3.3.1" % "provided"
+libraryDependencies += "com.github.daddykotex" %% "courier" % "3.2.0"
