@@ -1,0 +1,875 @@
+scala> :paste
+// Entering paste mode (ctrl-D to finish)
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import scala.annotation.tailrec
+import scala.util.Try
+
+implicit class DFHelpers(df: DataFrame) {
+    def columns = {
+      val dfColumns = df.columns.map(_.toLowerCase)
+      df.schema.fields.flatMap { data =>
+        data match {
+          case column if column.dataType.isInstanceOf[StructType] => {
+            column.dataType.asInstanceOf[StructType].fields.map { field =>
+              val columnName = column.name
+              val fieldName = field.name
+              col(s"${columnName}.${fieldName}").as(s"${columnName}_${fieldName}")
+            }.toList
+          }
+          case column => List(col(s"${column.name}"))
+        }
+      }
+    }
+
+    def flatten: DataFrame = {
+      val empty = df.schema.filter(_.dataType.isInstanceOf[StructType]).isEmpty
+      empty match {
+        case false =>
+          df.select(columns: _*).flatten
+        case _ => df
+      }
+    }
+    def explodeColumns = {
+      @tailrec
+      def columns(cdf: DataFrame):DataFrame = cdf.schema.fields.filter(_.dataType.typeName == "array") match {
+        case c if !c.isEmpty => columns(c.foldLeft(cdf)((dfa,field) => {
+          dfa.withColumn(field.name,explode_outer(col(s"${field.name}"))).flatten
+        }))
+        case _ => cdf
+      }
+      columns(df.flatten)
+    }
+}
+
+// Exiting paste mode, now interpreting.
+
+import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+import scala.annotation.tailrec
+import scala.util.Try
+defined class DFHelpers
+
+df.explodeColumns.printSchema
+
+import com.amazon.deequ.suggestions.{ConstraintSuggestionRunner, Rules}
+import spark.implicits._ // for toDS method
+
+// We ask deequ to compute constraint suggestions for us on the data
+val suggestionResult = { ConstraintSuggestionRunner()
+  .onData(inputDataFrame.explodeColumns)
+  .addConstraintRules(Rules.DEFAULT)
+  .run()
+}
+
+suggestionResult.constraintSuggestions.foreach { case (column, suggestions) =>
+  suggestions.foreach { suggestion =>
+    println(s"Constraint suggestion for '$column':\t${suggestion.description}\n" +
+      s"The corresponding scala code is ${suggestion.codeForConstraint}\n")
+  }
+}
+
+//Following suggestion were printed:
+
+Constraint suggestion for 'properties_dropped_frames':	'properties_dropped_frames' has value range '6'
+The corresponding scala code is .isContainedIn("properties_dropped_frames", Array("6"))
+
+Constraint suggestion for 'properties_dropped_frames':	'properties_dropped_frames' has no negative values
+The corresponding scala code is .isNonNegative("properties_dropped_frames")
+
+Constraint suggestion for 'context_traits_date_of_birth_format':	'context_traits_date_of_birth_format' is not null
+The corresponding scala code is .isComplete("context_traits_date_of_birth_format")
+
+Constraint suggestion for 'context_traits_date_of_birth_format':	'context_traits_date_of_birth_format' has value range ''
+The corresponding scala code is .isContainedIn("context_traits_date_of_birth_format", Array(""))
+
+Constraint suggestion for 'properties_playback_tag':	'properties_playback_tag' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_playback_tag", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_playback_tag':	'properties_playback_tag' has value range '{"audio_channel":"stereo","audio_codec":"aac","container":"fmp4","dynamic_range":"sdr","encryption":"widevine","ladder":"tv","package":"dash","resolution":"sd","video_codec":"h264"}'
+The corresponding scala code is .isContainedIn("properties_playback_tag", Array("{\"audio_channel\":\"stereo\",\"audio_codec\":\"aac\",\"container\":\"fmp4\",\"dynamic_range\":\"sdr\",\"encryption\":\"widevine\",\"ladder\":\"tv\",\"package\":\"dash\",\"resolution\":\"sd\",\"video_codec\":\"h264\"}"))
+
+Constraint suggestion for 'properties_utm_source':	'properties_utm_source' is not null
+The corresponding scala code is .isComplete("properties_utm_source")
+
+Constraint suggestion for 'properties_utm_source':	'properties_utm_source' has value range ''
+The corresponding scala code is .isContainedIn("properties_utm_source", Array(""))
+
+Constraint suggestion for 'context_traits_display_language':	'context_traits_display_language' is not null
+The corresponding scala code is .isComplete("context_traits_display_language")
+
+Constraint suggestion for 'context_traits_display_language':	'context_traits_display_language' has value range 'eng'
+The corresponding scala code is .isContainedIn("context_traits_display_language", Array("eng"))
+
+Constraint suggestion for 'context_traits_p_id':	'context_traits_p_id' is not null
+The corresponding scala code is .isComplete("context_traits_p_id")
+
+Constraint suggestion for 'context_userAgent':	'context_userAgent' is not null
+The corresponding scala code is .isComplete("context_userAgent")
+
+Constraint suggestion for 'context_userAgent':	'context_userAgent' has value range 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'
+The corresponding scala code is .isContainedIn("context_userAgent", Array("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36"))
+
+Constraint suggestion for 'properties_auto_play_allowed':	'properties_auto_play_allowed' has value range 'yes'
+The corresponding scala code is .isContainedIn("properties_auto_play_allowed", Array("yes"))
+
+Constraint suggestion for 'properties_video_position':	'properties_video_position' has value range '1846'
+The corresponding scala code is .isContainedIn("properties_video_position", Array("1846"))
+
+Constraint suggestion for 'properties_video_position':	'properties_video_position' has no negative values
+The corresponding scala code is .isNonNegative("properties_video_position")
+
+Constraint suggestion for 'properties_start_lag':	'properties_start_lag' has no negative values
+The corresponding scala code is .isNonNegative("properties_start_lag")
+
+Constraint suggestion for 'properties_screen_width':	'properties_screen_width' is not null
+The corresponding scala code is .isComplete("properties_screen_width")
+
+Constraint suggestion for 'properties_screen_width':	'properties_screen_width' has type Fractional
+The corresponding scala code is .hasDataType("properties_screen_width", ConstrainableDataTypes.Fractional)
+
+Constraint suggestion for 'properties_screen_width':	'properties_screen_width' has no negative values
+The corresponding scala code is .isNonNegative("properties_screen_width")
+
+Constraint suggestion for 'properties_monetizable':	'properties_monetizable' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_monetizable", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_image_attributes':	'properties_referrer_image_attributes' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_image_attributes", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_image_attributes':	'properties_referrer_image_attributes' has value range 'script_lang=eng,callout_lang=hin,logic=lang,theme=DEFAULT'
+The corresponding scala code is .isContainedIn("properties_referrer_image_attributes", Array("script_lang=eng,callout_lang=hin,logic=lang,theme=DEFAULT"))
+
+Constraint suggestion for 'properties_user_segments':	'properties_user_segments' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_user_segments", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_user_segments':	'properties_user_segments' has value range '["STATE_MH","CITY_PUNE","COUNTRY_IN","GPS_STATE_NA","GPS_CITY_NA"]', '{"data":["STATE_MH","CITY_PUNE","COUNTRY_IN","GPS_STATE_NA","GPS_CITY_NA"],"STATE":"MH","CITY":"PUNE","COUNTRY":"IN","GPS":"CITY_NA"}'
+The corresponding scala code is .isContainedIn("properties_user_segments", Array("[\"STATE_MH\",\"CITY_PUNE\",\"COUNTRY_IN\",\"GPS_STATE_NA\",\"GPS_CITY_NA\"]", "{\"data\":[\"STATE_MH\",\"CITY_PUNE\",\"COUNTRY_IN\",\"GPS_STATE_NA\",\"GPS_CITY_NA\"],\"STATE\":\"MH\",\"CITY\":\"PUNE\",\"COUNTRY\":\"IN\",\"GPS\":\"CITY_NA\"}"))
+
+Constraint suggestion for 'properties_tray_id':	'properties_tray_id' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_tray_id", Array("na"))
+
+Constraint suggestion for 'properties_referrer_label':	'properties_referrer_label' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_label", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_label':	'properties_referrer_label' has value range 'SUBSCRIBER'
+The corresponding scala code is .isContainedIn("properties_referrer_label", Array("SUBSCRIBER"))
+
+Constraint suggestion for 'properties_manifest_load_time':	'properties_manifest_load_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_manifest_load_time")
+
+Constraint suggestion for 'timestamp':	'timestamp' is not null
+The corresponding scala code is .isComplete("timestamp")
+
+Constraint suggestion for 'properties_total_buffer_count':	'properties_total_buffer_count' has value range '0'
+The corresponding scala code is .isContainedIn("properties_total_buffer_count", Array("0"))
+
+Constraint suggestion for 'properties_total_buffer_count':	'properties_total_buffer_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_total_buffer_count")
+
+Constraint suggestion for 'context_app_version':	'context_app_version' is not null
+The corresponding scala code is .isComplete("context_app_version")
+
+Constraint suggestion for 'context_app_version':	'context_app_version' has value range '2.14.0'
+The corresponding scala code is .isContainedIn("context_app_version", Array("2.14.0"))
+
+Constraint suggestion for 'properties_current_height':	'properties_current_height' has value range '360'
+The corresponding scala code is .isContainedIn("properties_current_height", Array("360"))
+
+Constraint suggestion for 'properties_current_height':	'properties_current_height' has no negative values
+The corresponding scala code is .isNonNegative("properties_current_height")
+
+Constraint suggestion for 'properties_play_type':	'properties_play_type' has value range 'watch page'
+The corresponding scala code is .isContainedIn("properties_play_type", Array("watch page"))
+
+Constraint suggestion for 'context_traits_platform':	'context_traits_platform' is not null
+The corresponding scala code is .isComplete("context_traits_platform")
+
+Constraint suggestion for 'context_traits_platform':	'context_traits_platform' has value range 'ANDROID', 'WEB', 'IOS', 'FIRESTICK'
+The corresponding scala code is .isContainedIn("context_traits_platform", Array("ANDROID", "WEB", "IOS", "FIRESTICK"))
+
+Constraint suggestion for 'context_traits_platform':	'context_traits_platform' has value range 'ANDROID', 'WEB', 'IOS' for at least 91.0% of values
+The corresponding scala code is .isContainedIn("context_traits_platform", Array("ANDROID", "WEB", "IOS"), _ >= 0.91, Some("It should be above 0.91!"))
+
+Constraint suggestion for 'context_traits_device_id':	'context_traits_device_id' is not null
+The corresponding scala code is .isComplete("context_traits_device_id")
+
+Constraint suggestion for 'properties_referrer_page_id':	'properties_referrer_page_id' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_page_id", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_page_id':	'properties_referrer_page_id' has value range '1926010474'
+The corresponding scala code is .isContainedIn("properties_referrer_page_id", Array("1926010474"))
+
+Constraint suggestion for 'properties_referrer_page_id':	'properties_referrer_page_id' has no negative values
+The corresponding scala code is .isNonNegative("properties_referrer_page_id")
+
+Constraint suggestion for 'properties_referrer_theme_name':	'properties_referrer_theme_name' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_theme_name", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_theme_name':	'properties_referrer_theme_name' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_referrer_theme_name", Array("na"))
+
+Constraint suggestion for 'context_traits_subscription_status':	'context_traits_subscription_status' is not null
+The corresponding scala code is .isComplete("context_traits_subscription_status")
+
+Constraint suggestion for 'context_traits_subscription_status':	'context_traits_subscription_status' has value range 'PREMIUM', 'FREEMIUM', 'FREE'
+The corresponding scala code is .isContainedIn("context_traits_subscription_status", Array("PREMIUM", "FREEMIUM", "FREE"))
+
+Constraint suggestion for 'event':	'event' is not null
+The corresponding scala code is .isComplete("event")
+
+Constraint suggestion for 'event':	'event' has value range 'Viewed Page', 'Ad Requested', 'Content Clicked', 'Watched Video', 'Started Video'
+The corresponding scala code is .isContainedIn("event", Array("Viewed Page", "Ad Requested", "Content Clicked", "Watched Video", "Started Video"))
+
+Constraint suggestion for 'event':	'event' has value range 'Viewed Page', 'Ad Requested', 'Content Clicked', 'Watched Video', 'Started Video' for at least 99.0% of values
+The corresponding scala code is .isContainedIn("event", Array("Viewed Page", "Ad Requested", "Content Clicked", "Watched Video", "Started Video"), _ >= 0.99, Some("It should be above 0.99!"))
+
+Constraint suggestion for 'context_traits_phone_number':	'context_traits_phone_number' is not null
+The corresponding scala code is .isComplete("context_traits_phone_number")
+
+Constraint suggestion for 'context_traits_phone_number':	'context_traits_phone_number' has value range ''
+The corresponding scala code is .isContainedIn("context_traits_phone_number", Array(""))
+
+Constraint suggestion for 'properties_referrer_tray_position':	'properties_referrer_tray_position' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_tray_position", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_tray_position':	'properties_referrer_tray_position' has value range '2'
+The corresponding scala code is .isContainedIn("properties_referrer_tray_position", Array("2"))
+
+Constraint suggestion for 'properties_referrer_tray_position':	'properties_referrer_tray_position' has no negative values
+The corresponding scala code is .isNonNegative("properties_referrer_tray_position")
+
+Constraint suggestion for 'properties_source':	'properties_source' has value range 'cms'
+The corresponding scala code is .isContainedIn("properties_source", Array("cms"))
+
+Constraint suggestion for 'properties_logic':	'properties_logic' has value range 'editorial'
+The corresponding scala code is .isContainedIn("properties_logic", Array("editorial"))
+
+Constraint suggestion for 'properties_pb_init':	'properties_pb_init' has no negative values
+The corresponding scala code is .isNonNegative("properties_pb_init")
+
+Constraint suggestion for 'context_traits_state':	'context_traits_state' is not null
+The corresponding scala code is .isComplete("context_traits_state")
+
+Constraint suggestion for 'context_traits_state':	'context_traits_state' has value range 'Rhode Island', 'Idaho', 'Nebraska', 'Maine', 'Pennsylvania', 'Hawaii', 'Massachusetts', 'Mississippi', 'Ohio', 'North Dakota', 'Vermont', 'Minnesota', 'New Jersey', 'Washington', 'Montana', 'New Mexico', 'Nevada', 'Maryland', 'Delaware', 'South Carolina', 'Wyoming', 'Arizona', 'North Carolina', 'West Virginia', 'Oklahoma', 'Kentucky', 'Texas', 'Florida', 'Tennessee', 'Alaska', 'Colorado', 'Iowa', 'Missouri', 'Georgia', 'Michigan', 'New Hampshire', 'South Dakota', 'Utah', 'Illinois', 'Arkansas', 'Virginia', 'Louisiana', 'California', 'Wisconsin', 'Kansas', 'Connecticut', 'Alabama', 'Oregon', 'Indiana', 'New York'
+The corresponding scala code is .isContainedIn("context_traits_state", Array("Rhode Island", "Idaho", "Nebraska", "Maine", "Pennsylvania", "Hawaii", "Massachusetts", "Mississippi", "Ohio", "North Dakota", "Vermont", "Minnesota", "New Jersey", "Washington", "Montana", "New Mexico", "Nevada", "Maryland", "Delaware", "South Carolina", "Wyoming", "Arizona", "North Carolina", "West Virginia", "Oklahoma", "Kentucky", "Texas", "Florida", "Tennessee", "Alaska", "Colorado", "Iowa", "Missouri", "Georgia", "Michigan", "New Hampshire", "South Dakota", "Utah", "Illinois", "Arkansas", "Virginia", "Louisiana", "California", "Wisconsin", "Kansas", "Connecticut", "Alabama", "Oregon", "Indiana", "New York"))
+
+Constraint suggestion for 'context_traits_state':	'context_traits_state' has value range 'Rhode Island', 'Idaho', 'Nebraska', 'Maine', 'Pennsylvania', 'Hawaii', 'Massachusetts', 'Mississippi', 'Ohio', 'North Dakota', 'Vermont', 'Minnesota', 'New Jersey', 'Washington', 'Montana', 'New Mexico', 'Nevada', 'Maryland', 'Delaware', 'South Carolina', 'Wyoming', 'Arizona', 'North Carolina', 'West Virginia', 'Oklahoma', 'Kentucky', 'Texas', 'Florida', 'Tennessee', 'Alaska', 'Colorado', 'Iowa', 'Missouri', 'Georgia', 'Michigan', 'New Hampshire', 'South Dakota', 'Utah', 'Illinois', 'Arkansas', 'Virginia', 'Louisiana', 'California' for at least 90.0% of values
+The corresponding scala code is .isContainedIn("context_traits_state", Array("Rhode Island", "Idaho", "Nebraska", "Maine", "Pennsylvania", "Hawaii", "Massachusetts", "Mississippi", "Ohio", "North Dakota", "Vermont", "Minnesota", "New Jersey", "Washington", "Montana", "New Mexico", "Nevada", "Maryland", "Delaware", "South Carolina", "Wyoming", "Arizona", "North Carolina", "West Virginia", "Oklahoma", "Kentucky", "Texas", "Florida", "Tennessee", "Alaska", "Colorado", "Iowa", "Missouri", "Georgia", "Michigan", "New Hampshire", "South Dakota", "Utah", "Illinois", "Arkansas", "Virginia", "Louisiana", "California"), _ >= 0.9, Some("It should be above 0.9!"))
+
+Constraint suggestion for 'properties_genre':	'properties_genre' is not null
+The corresponding scala code is .isComplete("properties_genre")
+
+Constraint suggestion for 'properties_genre':	'properties_genre' has value range 'Drama', 'Action', 'Thriller', 'Romance', 'Horror'
+The corresponding scala code is .isContainedIn("properties_genre", Array("Drama", "Action", "Thriller", "Romance", "Horror"))
+
+Constraint suggestion for 'context_page_title':	'context_page_title' is not null
+The corresponding scala code is .isComplete("context_page_title")
+
+Constraint suggestion for 'properties_image_attributes':	'properties_image_attributes' has value range 'theme=DEFAULT'
+The corresponding scala code is .isContainedIn("properties_image_attributes", Array("theme=DEFAULT"))
+
+Constraint suggestion for 'properties_rewind_count':	'properties_rewind_count' has value range '0'
+The corresponding scala code is .isContainedIn("properties_rewind_count", Array("0"))
+
+Constraint suggestion for 'properties_rewind_count':	'properties_rewind_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_rewind_count")
+
+Constraint suggestion for 'properties_stream_quality':	'properties_stream_quality' has value range 'fhdp'
+The corresponding scala code is .isContainedIn("properties_stream_quality", Array("fhdp"))
+
+Constraint suggestion for 'properties_referrer_source':	'properties_referrer_source' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_source", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_source':	'properties_referrer_source' has value range 'persona'
+The corresponding scala code is .isContainedIn("properties_referrer_source", Array("persona"))
+
+Constraint suggestion for 'properties_playback_url_fetch_time':	'properties_playback_url_fetch_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_playback_url_fetch_time")
+
+Constraint suggestion for 'properties_sub_title':	'properties_sub_title' is not null
+The corresponding scala code is .isComplete("properties_sub_title")
+
+Constraint suggestion for 'context_traits_login_method':	'context_traits_login_method' is not null
+The corresponding scala code is .isComplete("context_traits_login_method")
+
+Constraint suggestion for 'context_traits_login_method':	'context_traits_login_method' has value range 'Guest'
+The corresponding scala code is .isContainedIn("context_traits_login_method", Array("Guest"))
+
+Constraint suggestion for 'properties_pb_pl_initialized':	'properties_pb_pl_initialized' has value range '264'
+The corresponding scala code is .isContainedIn("properties_pb_pl_initialized", Array("264"))
+
+Constraint suggestion for 'properties_pb_pl_initialized':	'properties_pb_pl_initialized' has no negative values
+The corresponding scala code is .isNonNegative("properties_pb_pl_initialized")
+
+Constraint suggestion for 'properties_referrer_page_title':	'properties_referrer_page_title' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_page_title", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_page_title':	'properties_referrer_page_title' has value range 'home'
+The corresponding scala code is .isContainedIn("properties_referrer_page_title", Array("home"))
+
+Constraint suggestion for 'properties_referrer':	'properties_referrer' has less than 69% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer", _ >= 0.31, Some("It should be above 0.31!"))
+
+Constraint suggestion for 'properties_label':	'properties_label' has value range 'SUBSCRIBER'
+The corresponding scala code is .isContainedIn("properties_label", Array("SUBSCRIBER"))
+
+Constraint suggestion for 'properties_drm_protected':	'properties_drm_protected' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_drm_protected", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_variant':	'properties_variant' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_variant", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_variant':	'properties_variant' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_variant", Array("na"))
+
+Constraint suggestion for 'properties_tray_position':	'properties_tray_position' has value range '1'
+The corresponding scala code is .isContainedIn("properties_tray_position", Array("1"))
+
+Constraint suggestion for 'properties_tray_position':	'properties_tray_position' has no negative values
+The corresponding scala code is .isNonNegative("properties_tray_position")
+
+Constraint suggestion for 'properties_current_bitrate':	'properties_current_bitrate' has value range '606012'
+The corresponding scala code is .isContainedIn("properties_current_bitrate", Array("606012"))
+
+Constraint suggestion for 'properties_current_bitrate':	'properties_current_bitrate' has no negative values
+The corresponding scala code is .isNonNegative("properties_current_bitrate")
+
+Constraint suggestion for 'properties_instance_watch_time':	'properties_instance_watch_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_instance_watch_time")
+
+Constraint suggestion for 'context_traits_subscription_ums_item_id':	'context_traits_subscription_ums_item_id' is not null
+The corresponding scala code is .isComplete("context_traits_subscription_ums_item_id")
+
+Constraint suggestion for 'context_traits_subscription_ums_item_id':	'context_traits_subscription_ums_item_id' has value range 'Free'
+The corresponding scala code is .isContainedIn("context_traits_subscription_ums_item_id", Array("Free"))
+
+Constraint suggestion for 'properties_language':	'properties_language' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_language", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_language':	'properties_language' has value range 'hindi', 'Hindi'
+The corresponding scala code is .isContainedIn("properties_language", Array("hindi", "Hindi"))
+
+Constraint suggestion for 'context_page_path':	'context_page_path' is not null
+The corresponding scala code is .isComplete("context_page_path")
+
+Constraint suggestion for 'context_page_path':	'context_page_path' has value range '/india'
+The corresponding scala code is .isContainedIn("context_page_path", Array("/india"))
+
+Constraint suggestion for 'properties_total_buffer_time':	'properties_total_buffer_time' has value range '0'
+The corresponding scala code is .isContainedIn("properties_total_buffer_time", Array("0"))
+
+Constraint suggestion for 'properties_total_buffer_time':	'properties_total_buffer_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_total_buffer_time")
+
+Constraint suggestion for 'properties_volume':	'properties_volume' has value range '1'
+The corresponding scala code is .isContainedIn("properties_volume", Array("1"))
+
+Constraint suggestion for 'properties_volume':	'properties_volume' has no negative values
+The corresponding scala code is .isNonNegative("properties_volume")
+
+Constraint suggestion for 'context_traits_lat':	'context_traits_lat' is not null
+The corresponding scala code is .isComplete("context_traits_lat")
+
+Constraint suggestion for 'properties_subtitle':	'properties_subtitle' has value range 'off'
+The corresponding scala code is .isContainedIn("properties_subtitle", Array("off"))
+
+Constraint suggestion for 'properties_audio':	'properties_audio' has value range 'hi'
+The corresponding scala code is .isContainedIn("properties_audio", Array("hi"))
+
+Constraint suggestion for 'properties_playback_start_bitrate':	'properties_playback_start_bitrate' has value range '606012'
+The corresponding scala code is .isContainedIn("properties_playback_start_bitrate", Array("606012"))
+
+Constraint suggestion for 'properties_playback_start_bitrate':	'properties_playback_start_bitrate' has no negative values
+The corresponding scala code is .isNonNegative("properties_playback_start_bitrate")
+
+Constraint suggestion for 'properties_requested_tag':	'properties_requested_tag' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_requested_tag", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_requested_tag':	'properties_requested_tag' has value range '{"audio_channel":"stereo","container":"fmp4","dynamic_range":"sdr","encryption":"widevine","ladder":"tv","package":"dash","resolution":"fhd","video_codec":"h264"}'
+The corresponding scala code is .isContainedIn("properties_requested_tag", Array("{\"audio_channel\":\"stereo\",\"container\":\"fmp4\",\"dynamic_range\":\"sdr\",\"encryption\":\"widevine\",\"ladder\":\"tv\",\"package\":\"dash\",\"resolution\":\"fhd\",\"video_codec\":\"h264\"}"))
+
+Constraint suggestion for 'properties_theme_name':	'properties_theme_name' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_theme_name", Array("na"))
+
+Constraint suggestion for 'properties_playback_start_resolution':	'properties_playback_start_resolution' has value range '360'
+The corresponding scala code is .isContainedIn("properties_playback_start_resolution", Array("360"))
+
+Constraint suggestion for 'properties_playback_start_resolution':	'properties_playback_start_resolution' has no negative values
+The corresponding scala code is .isNonNegative("properties_playback_start_resolution")
+
+Constraint suggestion for 'properties_tray_name':	'properties_tray_name' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_tray_name", Array("na"))
+
+Constraint suggestion for 'properties_ab_name':	'properties_ab_name' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_ab_name", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_ab_name':	'properties_ab_name' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_ab_name", Array("na"))
+
+Constraint suggestion for 'properties_ad_type':	'properties_ad_type' has value range 'video'
+The corresponding scala code is .isContainedIn("properties_ad_type", Array("video"))
+
+Constraint suggestion for 'properties_content_type':	'properties_content_type' is not null
+The corresponding scala code is .isComplete("properties_content_type")
+
+Constraint suggestion for 'properties_content_type':	'properties_content_type' has value range 'EPISODE', 'MOVIE', 'SERIES'
+The corresponding scala code is .isContainedIn("properties_content_type", Array("EPISODE", "MOVIE", "SERIES"))
+
+Constraint suggestion for 'properties_content_type':	'properties_content_type' has value range 'EPISODE', 'MOVIE', 'SERIES' for at least 99.0% of values
+The corresponding scala code is .isContainedIn("properties_content_type", Array("EPISODE", "MOVIE", "SERIES"), _ >= 0.99, Some("It should be above 0.99!"))
+
+Constraint suggestion for 'properties_player_load_time':	'properties_player_load_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_player_load_time")
+
+Constraint suggestion for 'properties_player_type':	'properties_player_type' has value range 'dash'
+The corresponding scala code is .isContainedIn("properties_player_type", Array("dash"))
+
+Constraint suggestion for 'properties_total_frames':	'properties_total_frames' has value range '12555'
+The corresponding scala code is .isContainedIn("properties_total_frames", Array("12555"))
+
+Constraint suggestion for 'properties_total_frames':	'properties_total_frames' has no negative values
+The corresponding scala code is .isNonNegative("properties_total_frames")
+
+Constraint suggestion for 'properties_total_ongoing_buffer_time':	'properties_total_ongoing_buffer_time' has value range '0'
+The corresponding scala code is .isContainedIn("properties_total_ongoing_buffer_time", Array("0"))
+
+Constraint suggestion for 'properties_total_ongoing_buffer_time':	'properties_total_ongoing_buffer_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_total_ongoing_buffer_time")
+
+Constraint suggestion for 'properties_forward_count':	'properties_forward_count' has value range '4'
+The corresponding scala code is .isContainedIn("properties_forward_count", Array("4"))
+
+Constraint suggestion for 'properties_forward_count':	'properties_forward_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_forward_count")
+
+Constraint suggestion for 'properties_is_cast':	'properties_is_cast' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_is_cast", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_referrer_page_name':	'properties_referrer_page_name' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_page_name", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_page_name':	'properties_referrer_page_name' has value range 'Landing'
+The corresponding scala code is .isContainedIn("properties_referrer_page_name", Array("Landing"))
+
+Constraint suggestion for 'context_traits_country':	'context_traits_country' is not null
+The corresponding scala code is .isComplete("context_traits_country")
+
+Constraint suggestion for 'context_traits_country':	'context_traits_country' has value range 'United States'
+The corresponding scala code is .isContainedIn("context_traits_country", Array("United States"))
+
+Constraint suggestion for 'properties_title':	'properties_title' has less than 5% missing values
+The corresponding scala code is .hasCompleteness("properties_title", _ >= 0.95, Some("It should be above 0.95!"))
+
+Constraint suggestion for 'context_traits_gender':	'context_traits_gender' is not null
+The corresponding scala code is .isComplete("context_traits_gender")
+
+Constraint suggestion for 'context_traits_gender':	'context_traits_gender' has value range ''
+The corresponding scala code is .isContainedIn("context_traits_gender", Array(""))
+
+Constraint suggestion for 'properties_twab':	'properties_twab' has value range '606012'
+The corresponding scala code is .isContainedIn("properties_twab", Array("606012"))
+
+Constraint suggestion for 'properties_twab':	'properties_twab' has no negative values
+The corresponding scala code is .isNonNegative("properties_twab")
+
+Constraint suggestion for 'properties_level_updates':	'properties_level_updates' has value range '2'
+The corresponding scala code is .isContainedIn("properties_level_updates", Array("2"))
+
+Constraint suggestion for 'properties_level_updates':	'properties_level_updates' has no negative values
+The corresponding scala code is .isNonNegative("properties_level_updates")
+
+Constraint suggestion for 'properties_tile_position':	'properties_tile_position' has value range '1'
+The corresponding scala code is .isContainedIn("properties_tile_position", Array("1"))
+
+Constraint suggestion for 'properties_tile_position':	'properties_tile_position' has no negative values
+The corresponding scala code is .isNonNegative("properties_tile_position")
+
+Constraint suggestion for 'properties_userAgent':	'properties_userAgent' is not null
+The corresponding scala code is .isComplete("properties_userAgent")
+
+Constraint suggestion for 'properties_userAgent':	'properties_userAgent' has value range 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36'
+The corresponding scala code is .isContainedIn("properties_userAgent", Array("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.0.0 Safari/537.36"))
+
+Constraint suggestion for 'properties_name':	'properties_name' has less than 69% missing values
+The corresponding scala code is .hasCompleteness("properties_name", _ >= 0.31, Some("It should be above 0.31!"))
+
+Constraint suggestion for 'properties_name':	'properties_name' has value range 'Watch'
+The corresponding scala code is .isContainedIn("properties_name", Array("Watch"))
+
+Constraint suggestion for 'properties_pl_ver':	'properties_pl_ver' is not null
+The corresponding scala code is .isComplete("properties_pl_ver")
+
+Constraint suggestion for 'properties_pl_ver':	'properties_pl_ver' has value range '1.23.6', 'vplay_2.54.2', ''
+The corresponding scala code is .isContainedIn("properties_pl_ver", Array("1.23.6", "vplay_2.54.2", ""))
+
+Constraint suggestion for 'properties_utm_content':	'properties_utm_content' is not null
+The corresponding scala code is .isComplete("properties_utm_content")
+
+Constraint suggestion for 'properties_utm_content':	'properties_utm_content' has value range ''
+The corresponding scala code is .isContainedIn("properties_utm_content", Array(""))
+
+Constraint suggestion for 'context_traits_profile':	'context_traits_profile' is not null
+The corresponding scala code is .isComplete("context_traits_profile")
+
+Constraint suggestion for 'context_traits_profile':	'context_traits_profile' has value range 'main'
+The corresponding scala code is .isContainedIn("context_traits_profile", Array("main"))
+
+Constraint suggestion for 'properties_seek_time':	'properties_seek_time' has value range '0'
+The corresponding scala code is .isContainedIn("properties_seek_time", Array("0"))
+
+Constraint suggestion for 'properties_seek_time':	'properties_seek_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_seek_time")
+
+Constraint suggestion for 'properties_api_version':	'properties_api_version' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_api_version", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_api_version':	'properties_api_version' has value range 'v4'
+The corresponding scala code is .isContainedIn("properties_api_version", Array("v4"))
+
+Constraint suggestion for 'properties_referrer_tray_name':	'properties_referrer_tray_name' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_tray_name", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_tray_name':	'properties_referrer_tray_name' has value range 'Latest & Trending'
+The corresponding scala code is .isContainedIn("properties_referrer_tray_name", Array("Latest & Trending"))
+
+Constraint suggestion for 'properties_utm_term':	'properties_utm_term' is not null
+The corresponding scala code is .isComplete("properties_utm_term")
+
+Constraint suggestion for 'properties_utm_term':	'properties_utm_term' has value range ''
+The corresponding scala code is .isContainedIn("properties_utm_term", Array(""))
+
+Constraint suggestion for 'properties_sub_content_id':	'properties_sub_content_id' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_sub_content_id", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_sub_content_id':	'properties_sub_content_id' has value range '4009'
+The corresponding scala code is .isContainedIn("properties_sub_content_id", Array("4009"))
+
+Constraint suggestion for 'properties_sub_content_id':	'properties_sub_content_id' has no negative values
+The corresponding scala code is .isNonNegative("properties_sub_content_id")
+
+Constraint suggestion for 'properties_lang_code':	'properties_lang_code' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_lang_code", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_lang_code':	'properties_lang_code' has value range 'hin'
+The corresponding scala code is .isContainedIn("properties_lang_code", Array("hin"))
+
+Constraint suggestion for 'context_page_url':	'context_page_url' is not null
+The corresponding scala code is .isComplete("context_page_url")
+
+Constraint suggestion for 'context_page_url':	'context_page_url' has value range 'https://www.acmeflix.com/india'
+The corresponding scala code is .isContainedIn("context_page_url", Array("https://www.acmeflix.com/india"))
+
+Constraint suggestion for 'context_traits_cookie_id':	'context_traits_cookie_id' is not null
+The corresponding scala code is .isComplete("context_traits_cookie_id")
+
+Constraint suggestion for 'context_page_referrer':	'context_page_referrer' is not null
+The corresponding scala code is .isComplete("context_page_referrer")
+
+Constraint suggestion for 'context_page_referrer':	'context_page_referrer' has value range ''
+The corresponding scala code is .isContainedIn("context_page_referrer", Array(""))
+
+Constraint suggestion for 'properties_referrer_name':	'properties_referrer_name' has less than 69% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_name", _ >= 0.31, Some("It should be above 0.31!"))
+
+Constraint suggestion for 'properties_referrer_name':	'properties_referrer_name' has value range 'Detail'
+The corresponding scala code is .isContainedIn("properties_referrer_name", Array("Detail"))
+
+Constraint suggestion for 'properties_is_premium':	'properties_is_premium' is not null
+The corresponding scala code is .isComplete("properties_is_premium")
+
+Constraint suggestion for 'properties_stream_type':	'properties_stream_type' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_stream_type", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_stream_type':	'properties_stream_type' has value range 'VoD'
+The corresponding scala code is .isContainedIn("properties_stream_type", Array("VoD"))
+
+Constraint suggestion for 'properties_current_time':	'properties_current_time' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_current_time", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_current_time':	'properties_current_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_current_time")
+
+Constraint suggestion for 'properties_buffer_time':	'properties_buffer_time' has value range '0'
+The corresponding scala code is .isContainedIn("properties_buffer_time", Array("0"))
+
+Constraint suggestion for 'properties_buffer_time':	'properties_buffer_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_buffer_time")
+
+Constraint suggestion for 'properties_current_level':	'properties_current_level' has value range '41'
+The corresponding scala code is .isContainedIn("properties_current_level", Array("41"))
+
+Constraint suggestion for 'properties_current_level':	'properties_current_level' has no negative values
+The corresponding scala code is .isNonNegative("properties_current_level")
+
+Constraint suggestion for 'properties_referrer_tile_position':	'properties_referrer_tile_position' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_referrer_tile_position", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_referrer_tile_position':	'properties_referrer_tile_position' has value range '1'
+The corresponding scala code is .isContainedIn("properties_referrer_tile_position", Array("1"))
+
+Constraint suggestion for 'properties_referrer_tile_position':	'properties_referrer_tile_position' has no negative values
+The corresponding scala code is .isNonNegative("properties_referrer_tile_position")
+
+Constraint suggestion for 'context_traits_is_parental_lock_enabled':	'context_traits_is_parental_lock_enabled' is not null
+The corresponding scala code is .isComplete("context_traits_is_parental_lock_enabled")
+
+Constraint suggestion for 'properties_captions_enabled':	'properties_captions_enabled' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_captions_enabled", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'context_page_search':	'context_page_search' is not null
+The corresponding scala code is .isComplete("context_page_search")
+
+Constraint suggestion for 'context_page_search':	'context_page_search' has value range ''
+The corresponding scala code is .isContainedIn("context_page_search", Array(""))
+
+Constraint suggestion for 'context_traits_city':	'context_traits_city' is not null
+The corresponding scala code is .isComplete("context_traits_city")
+
+Constraint suggestion for 'properties_total_seek_count':	'properties_total_seek_count' has value range '4'
+The corresponding scala code is .isContainedIn("properties_total_seek_count", Array("4"))
+
+Constraint suggestion for 'properties_total_seek_count':	'properties_total_seek_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_total_seek_count")
+
+Constraint suggestion for 'sentAt':	'sentAt' is not null
+The corresponding scala code is .isComplete("sentAt")
+
+Constraint suggestion for 'properties_episode':	'properties_episode' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_episode", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_episode':	'properties_episode' has type Integral
+The corresponding scala code is .hasDataType("properties_episode", ConstrainableDataTypes.Integral)
+
+Constraint suggestion for 'properties_episode':	'properties_episode' has value range '1', '5', '3', '7', '6', '4', '2', '10', '8', '9'
+The corresponding scala code is .isContainedIn("properties_episode", Array("1", "5", "3", "7", "6", "4", "2", "10", "8", "9"))
+
+Constraint suggestion for 'properties_episode':	'properties_episode' has value range '1', '5', '3', '7', '6', '4', '2', '10' for at least 89.0% of values
+The corresponding scala code is .isContainedIn("properties_episode", Array("1", "5", "3", "7", "6", "4", "2", "10"), _ >= 0.89, Some("It should be above 0.89!"))
+
+Constraint suggestion for 'properties_episode':	'properties_episode' has no negative values
+The corresponding scala code is .isNonNegative("properties_episode")
+
+Constraint suggestion for 'properties_user_action':	'properties_user_action' has value range 'click'
+The corresponding scala code is .isContainedIn("properties_user_action", Array("click"))
+
+Constraint suggestion for 'properties_page_id':	'properties_page_id' has less than 52% missing values
+The corresponding scala code is .hasCompleteness("properties_page_id", _ >= 0.48, Some("It should be above 0.48!"))
+
+Constraint suggestion for 'properties_page_id':	'properties_page_id' has type Integral
+The corresponding scala code is .hasDataType("properties_page_id", ConstrainableDataTypes.Integral)
+
+Constraint suggestion for 'properties_page_id':	'properties_page_id' has no negative values
+The corresponding scala code is .isNonNegative("properties_page_id")
+
+Constraint suggestion for 'properties_watch_time':	'properties_watch_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_watch_time")
+
+Constraint suggestion for 'properties_auto_played':	'properties_auto_played' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_auto_played", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'userId':	'userId' is not null
+The corresponding scala code is .isComplete("userId")
+
+Constraint suggestion for 'properties_utm_medium':	'properties_utm_medium' is not null
+The corresponding scala code is .isComplete("properties_utm_medium")
+
+Constraint suggestion for 'properties_utm_medium':	'properties_utm_medium' has value range ''
+The corresponding scala code is .isContainedIn("properties_utm_medium", Array(""))
+
+Constraint suggestion for 'context_traits_long':	'context_traits_long' is not null
+The corresponding scala code is .isComplete("context_traits_long")
+
+Constraint suggestion for 'properties_video_length':	'properties_video_length' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_video_length", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_video_length':	'properties_video_length' has no negative values
+The corresponding scala code is .isNonNegative("properties_video_length")
+
+Constraint suggestion for 'type':	'type' is not null
+The corresponding scala code is .isComplete("type")
+
+Constraint suggestion for 'type':	'type' has value range 'track'
+The corresponding scala code is .isContainedIn("type", Array("track"))
+
+Constraint suggestion for 'properties_load_time':	'properties_load_time' has less than 69% missing values
+The corresponding scala code is .hasCompleteness("properties_load_time", _ >= 0.31, Some("It should be above 0.31!"))
+
+Constraint suggestion for 'properties_load_time':	'properties_load_time' has type Fractional
+The corresponding scala code is .hasDataType("properties_load_time", ConstrainableDataTypes.Fractional)
+
+Constraint suggestion for 'properties_load_time':	'properties_load_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_load_time")
+
+Constraint suggestion for 'properties_utm_campaign':	'properties_utm_campaign' is not null
+The corresponding scala code is .isComplete("properties_utm_campaign")
+
+Constraint suggestion for 'properties_utm_campaign':	'properties_utm_campaign' has value range ''
+The corresponding scala code is .isContainedIn("properties_utm_campaign", Array(""))
+
+Constraint suggestion for 'properties_channel':	'properties_channel' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_channel", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_channel':	'properties_channel' has value range 'acmeflix Specials'
+The corresponding scala code is .isContainedIn("properties_channel", Array("acmeflix Specials"))
+
+Constraint suggestion for 'properties_host_name':	'properties_host_name' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_host_name", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_host_name':	'properties_host_name' has value range 'hses6.acmeflix.com'
+The corresponding scala code is .isContainedIn("properties_host_name", Array("hses6.acmeflix.com"))
+
+Constraint suggestion for 'properties_buffer_count':	'properties_buffer_count' has value range '0'
+The corresponding scala code is .isContainedIn("properties_buffer_count", Array("0"))
+
+Constraint suggestion for 'properties_buffer_count':	'properties_buffer_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_buffer_count")
+
+Constraint suggestion for 'properties_screen_mode':	'properties_screen_mode' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_screen_mode", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_screen_mode':	'properties_screen_mode' has value range 'landscape', 'Potrait'
+The corresponding scala code is .isContainedIn("properties_screen_mode", Array("landscape", "Potrait"))
+
+Constraint suggestion for 'properties_screen_height':	'properties_screen_height' is not null
+The corresponding scala code is .isComplete("properties_screen_height")
+
+Constraint suggestion for 'properties_screen_height':	'properties_screen_height' has type Fractional
+The corresponding scala code is .hasDataType("properties_screen_height", ConstrainableDataTypes.Fractional)
+
+Constraint suggestion for 'properties_screen_height':	'properties_screen_height' has no negative values
+The corresponding scala code is .isNonNegative("properties_screen_height")
+
+Constraint suggestion for 'properties_season':	'properties_season' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_season", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_season':	'properties_season' has type Integral
+The corresponding scala code is .hasDataType("properties_season", ConstrainableDataTypes.Integral)
+
+Constraint suggestion for 'properties_season':	'properties_season' has value range '1'
+The corresponding scala code is .isContainedIn("properties_season", Array("1"))
+
+Constraint suggestion for 'properties_season':	'properties_season' has no negative values
+The corresponding scala code is .isNonNegative("properties_season")
+
+Constraint suggestion for 'properties_bytes_downloaded':	'properties_bytes_downloaded' has value range '54447745'
+The corresponding scala code is .isContainedIn("properties_bytes_downloaded", Array("54447745"))
+
+Constraint suggestion for 'properties_bytes_downloaded':	'properties_bytes_downloaded' has no negative values
+The corresponding scala code is .isNonNegative("properties_bytes_downloaded")
+
+Constraint suggestion for 'properties_content_id':	'properties_content_id' is not null
+The corresponding scala code is .isComplete("properties_content_id")
+
+Constraint suggestion for 'properties_content_id':	'properties_content_id' has type Integral
+The corresponding scala code is .hasDataType("properties_content_id", ConstrainableDataTypes.Integral)
+
+Constraint suggestion for 'properties_content_id':	'properties_content_id' has no negative values
+The corresponding scala code is .isNonNegative("properties_content_id")
+
+Constraint suggestion for 'properties_page_load_time':	'properties_page_load_time' has less than 69% missing values
+The corresponding scala code is .hasCompleteness("properties_page_load_time", _ >= 0.31, Some("It should be above 0.31!"))
+
+Constraint suggestion for 'properties_page_load_time':	'properties_page_load_time' has type Fractional
+The corresponding scala code is .hasDataType("properties_page_load_time", ConstrainableDataTypes.Fractional)
+
+Constraint suggestion for 'properties_page_load_time':	'properties_page_load_time' has no negative values
+The corresponding scala code is .isNonNegative("properties_page_load_time")
+
+Constraint suggestion for 'properties_seek_count':	'properties_seek_count' has value range '4'
+The corresponding scala code is .isContainedIn("properties_seek_count", Array("4"))
+
+Constraint suggestion for 'properties_seek_count':	'properties_seek_count' has no negative values
+The corresponding scala code is .isNonNegative("properties_seek_count")
+
+Constraint suggestion for 'properties_pb_started':	'properties_pb_started' has no negative values
+The corresponding scala code is .isNonNegative("properties_pb_started")
+
+Constraint suggestion for 'properties_tray_global_id':	'properties_tray_global_id' has value range 'na'
+The corresponding scala code is .isContainedIn("properties_tray_global_id", Array("na"))
+
+Constraint suggestion for 'properties_page_name':	'properties_page_name' has value range 'Detail'
+The corresponding scala code is .isContainedIn("properties_page_name", Array("Detail"))
+
+Constraint suggestion for 'context_traits_ads_country':	'context_traits_ads_country' is not null
+The corresponding scala code is .isComplete("context_traits_ads_country")
+
+Constraint suggestion for 'context_traits_ads_country':	'context_traits_ads_country' has value range 'United States'
+The corresponding scala code is .isContainedIn("context_traits_ads_country", Array("United States"))
+
+Constraint suggestion for 'properties_playback_format':	'properties_playback_format' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_playback_format", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_playback_format':	'properties_playback_format' has value range 'dash'
+The corresponding scala code is .isContainedIn("properties_playback_format", Array("dash"))
+
+Constraint suggestion for 'properties_studio_id':	'properties_studio_id' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_studio_id", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_studio_id':	'properties_studio_id' has value range '352'
+The corresponding scala code is .isContainedIn("properties_studio_id", Array("352"))
+
+Constraint suggestion for 'properties_studio_id':	'properties_studio_id' has no negative values
+The corresponding scala code is .isNonNegative("properties_studio_id")
+
+Constraint suggestion for 'properties_client_capabilities':	'properties_client_capabilities' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_client_capabilities", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_client_capabilities':	'properties_client_capabilities' has value range '{"video_codec":["h264"],"containers":["fmp4"],"audio_channel":["stereo"],"encryption":["widevine"],"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"widevine_hdcp_version":["HDCP_V2_2","HDCP_V2_1","HDCP_V2","HDCP_V1"],"ads":["non_ssai"],"dvr":["short"],"dynamicRange":["sdr"],"ladder":["tv"],"package":["dash","hls"],"resolution":["hd"]}'
+The corresponding scala code is .isContainedIn("properties_client_capabilities", Array("{\"video_codec\":[\"h264\"],\"containers\":[\"fmp4\"],\"audio_channel\":[\"stereo\"],\"encryption\":[\"widevine\"],\"widevine_security_level\":[\"SW_SECURE_DECODE\",\"SW_SECURE_CRYPTO\"],\"widevine_hdcp_version\":[\"HDCP_V2_2\",\"HDCP_V2_1\",\"HDCP_V2\",\"HDCP_V1\"],\"ads\":[\"non_ssai\"],\"dvr\":[\"short\"],\"dynamicRange\":[\"sdr\"],\"ladder\":[\"tv\"],\"package\":[\"dash\",\"hls\"],\"resolution\":[\"hd\"]}"))
+
+Constraint suggestion for 'context_library_name':	'context_library_name' is not null
+The corresponding scala code is .isComplete("context_library_name")
+
+Constraint suggestion for 'context_library_name':	'context_library_name' has value range 'analytics.js'
+The corresponding scala code is .isContainedIn("context_library_name", Array("analytics.js"))
+
+Constraint suggestion for 'properties_tp_deltas':	'properties_tp_deltas' has value range '{"mtp_current":7.79,"rmse":1.29,"mean_error":0.28,"mre":0.04,"mwre":0.01,"estimator_type":"vplay"}'
+The corresponding scala code is .isContainedIn("properties_tp_deltas", Array("{\"mtp_current\":7.79,\"rmse\":1.29,\"mean_error\":0.28,\"mre\":0.04,\"mwre\":0.01,\"estimator_type\":\"vplay\"}"))
+
+Constraint suggestion for 'properties_page_title':	'properties_page_title' has less than 80% missing values
+The corresponding scala code is .hasCompleteness("properties_page_title", _ >= 0.2, Some("It should be above 0.2!"))
+
+Constraint suggestion for 'properties_pb_loaddstart':	'properties_pb_loaddstart' has no negative values
+The corresponding scala code is .isNonNegative("properties_pb_loaddstart")
+
+Constraint suggestion for 'context_traits_plan_type':	'context_traits_plan_type' is not null
+The corresponding scala code is .isComplete("context_traits_plan_type")
+
+Constraint suggestion for 'context_traits_plan_type':	'context_traits_plan_type' has value range 'PREMIUM', 'FREEMIUM', 'FREE'
+The corresponding scala code is .isContainedIn("context_traits_plan_type", Array("PREMIUM", "FREEMIUM", "FREE"))
+
+Constraint suggestion for 'properties_playback_type':	'properties_playback_type' has less than 49% missing values
+The corresponding scala code is .hasCompleteness("properties_playback_type", _ >= 0.51, Some("It should be above 0.51!"))
+
+Constraint suggestion for 'properties_playback_type':	'properties_playback_type' has value range 'Streaming'
+The corresponding scala code is .isContainedIn("properties_playback_type", Array("Streaming"))
+
+Constraint suggestion for 'properties_ad_request_protocol':	'properties_ad_request_protocol' has value range 'vast'
+The corresponding scala code is .isContainedIn("properties_ad_request_protocol", Array("vast"))
+
+Constraint suggestion for 'properties_player_name':	'properties_player_name' is not null
+The corresponding scala code is .isComplete("properties_player_name")
+
+Constraint suggestion for 'properties_player_name':	'properties_player_name' has value range 'webplayer', 'vplay'
+The corresponding scala code is .isContainedIn("properties_player_name", Array("webplayer", "vplay"))
+
+Constraint suggestion for 'properties_ad_placement':	'properties_ad_placement' has value range 'pre_roll'
+The corresponding scala code is .isContainedIn("properties_ad_placement", Array("pre_roll"))
+
+Constraint suggestion for 'properties_playback_state':	'properties_playback_state' has value range 'playback started'
+The corresponding scala code is .isContainedIn("properties_playback_state", Array("playback started"))
+
+Constraint suggestion for 'properties_studio_name':	'properties_studio_name' has less than 65% missing values
+The corresponding scala code is .hasCompleteness("properties_studio_name", _ >= 0.34, Some("It should be above 0.34!"))
+
+Constraint suggestion for 'properties_studio_name':	'properties_studio_name' has value range 'Web3 Media ltd'
+The corresponding scala code is .isContainedIn("properties_studio_name", Array("Web3 Media ltd"))
+
+Constraint suggestion for 'context_traits_logged_in_status':	'context_traits_logged_in_status' is not null
+The corresponding scala code is .isComplete("context_traits_logged_in_status")
+
+
