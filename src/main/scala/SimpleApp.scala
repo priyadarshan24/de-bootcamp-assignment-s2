@@ -20,7 +20,7 @@ object SimpleApp {
   def main(args: Array[String]) {
 
     //val conf = new SparkConf().setMaster("spark://Priyadarshans-MacBook-Pro-2.local:8083").setAppName("Simple Application")
-    val spark = SparkSession.builder.master("spark://Priyadarshans-MacBook-Pro-2.local:7077").appName("Simple Application").config("spark.sql.warehouse.dir", "/Users/priyadarshanp/myOpensourceContribution/DEBootCamp_GitVersion/de-bootcamp-assignment-s2/spark-warehouse").enableHiveSupport().getOrCreate()
+    val spark = SparkSession.builder.master("spark://Priyadarshans-MacBook-Pro-2.local:7077").appName("Simple Application").config("spark.sql.warehouse.dir", "/Users/priyadarshanp/myOpensourceContribution/airflow/de-bootcamp-assignment-s2/spark-warehouse").enableHiveSupport().getOrCreate()
     val toBeProcessedFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/toBeProcessed"
     val processedFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/Processed"
     val reportFolderLocation = "/Users/priyadarshanp/Documents/DEBootCamp/files/Reports"
@@ -88,7 +88,7 @@ object SimpleApp {
       processedFileDataFrameWithDateTimeStamp
         //.repartition(4)
         .write
-        .option("path", "/Users/priyadarshanp/myOpensourceContribution/DEBootCamp_GitVersion/de-bootcamp-assignment-s2/spark-warehouse/ga_events")
+        .option("path", "/Users/priyadarshanp/myOpensourceContribution/airflow/de-bootcamp-assignment-s2/spark-warehouse/ga_events")
         .partitionBy("eventDate","event")
         .mode("append")
         .format("parquet").saveAsTable("ga_events")

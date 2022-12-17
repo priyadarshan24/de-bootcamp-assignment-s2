@@ -1,0 +1,23 @@
+../bin/spark-submit \
+  --class SimpleApp \
+  --master spark://Priyadarshans-MacBook-Pro-2.local:7077 \
+  --deploy-mode cluster \
+  --supervise \
+  --executor-memory 4G \
+  --total-executor-cores 4 \
+  --driver-java-options --add-opens
+  /Users/priyadarshanp/myOpensourceContribution/airflow/de-bootcamp-assignment-s2/target/scala-2.12/de-bootcamp-assignment-s2-assembly-0.1.0-SNAPSHOT.jar
+
+      # @task
+    # def add_one(x: int):
+    #     return x + 1
+
+    # @task
+    # def sum_it(values):
+    #     total = sum(values)
+    #     print(f"Total was {total}")
+
+    # added_values = add_one.expand(x=[1, 2, 3])
+    # sum_it(added_values)
+
+
