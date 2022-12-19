@@ -6,8 +6,12 @@ lazy val root = (project in file("."))
   .settings(
     name := "de-bootcamp-assignment-s2"
   )
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", xs @ _*) => MergeStrategy.discard
+  case x => MergeStrategy.first
+}
 
 libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.3.1"
 // https://mvnrepository.com/artifact/org.apache.spark/spark-hive
-libraryDependencies += "org.apache.spark" %% "spark-hive" % "3.3.1" % "provided"
+libraryDependencies += "org.apache.spark" %% "spark-hive" % "3.3.1"
 libraryDependencies += "com.github.daddykotex" %% "courier" % "3.2.0"
