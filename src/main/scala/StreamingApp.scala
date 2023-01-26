@@ -1,17 +1,5 @@
-import courier.Defaults._
-import courier._
-import org.apache.spark.sql.Row.empty.schema
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions.{col, from_json}
-import org.apache.spark.sql.types.{IntegerType, StringType, StructType}
-import org.apache.spark.sql.{SaveMode, SparkSession}
-
-import java.io.File
-import java.nio.file.{Files, Path, Paths, StandardCopyOption}
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.{io, util}
-import scala.reflect.io.Directory
-import scala.util._
 
 object StreamingApp {
 
@@ -39,33 +27,33 @@ object StreamingApp {
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:29092")
-      .option("subscribe", "acmeFlixStream")
+      .option("subscribe", "eventStream2")
       .load()
-      .select(from_json(col("value").cast("string"), acmeFlixStreamingSchema).alias("parsed_value"))
-     // .select(col("parsed_value.videoId"), col("parsed_value.segmentId"))
+      .select(from_json(col("value").cast("string"), acmeFlixStreamingSchema).alias("parsed_valuev2"))
+
+    jsonDf
+      .writeStream
+      .outputMode("Append")
+      .format("console")
+      .start()
+
 
     jsonDf.createOrReplaceTempView("acmeFlixView")
-    val acmeFLixTableView = spark.sql("select parsed_value.deviceId from acmeFlixView")
+    val acmeFLixTableView = spark.sql("select count(*), parsed_valuev2.videoId, parsed_valuev2.segmentId from acmeFlixView group by parsed_valuev2.videoId, parsed_valuev2.segmentId")
     acmeFLixTableView
       .writeStream
-      .outputMode("update")
+      .outputMode("Update")
       .format("console")
       .start()
-      .awaitTermination()
-
-    df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-      .as[(String, String)]
 
 
-    df
+    /*jsonDf
       .writeStream
-      .outputMode("update")
-      .format("console")
-      .start()
-      .awaitTermination()
-
+      .outputMode("Append")
+      .format("json")
+      .option("checkpointLocation", "/Users/priyadarshanp/myOpensourceContribution/airflow/de-bootcamp-assignment-s2/checkpoint")
+      .option("path", "/Users/priyadarshanp/myOpensourceContribution/airflow/de-bootcamp-assignment-s2")
+      .start()*/
     System.out.println("Read Kafka stream")
-    //df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
-      //.as[(String, String)]
   }
 }
