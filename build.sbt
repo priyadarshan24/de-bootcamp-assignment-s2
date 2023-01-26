@@ -15,3 +15,5 @@ libraryDependencies += "org.apache.spark" %% "spark-sql" % "3.3.1"
 // https://mvnrepository.com/artifact/org.apache.spark/spark-hive
 libraryDependencies += "org.apache.spark" %% "spark-hive" % "3.3.1"
 libraryDependencies += "com.github.daddykotex" %% "courier" % "3.2.0"
+// https://mvnrepository.com/artifact/org.apache.spark/spark-sql-kafka-0-10
+libraryDependencies += "org.apache.spark" %% "spark-sql-kafka-0-10" % "3.3.1" % Test
